@@ -1,15 +1,19 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
 
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+
+import '../components/checkout_sheet.dart';
 import '../components/restaurant_item.dart';
 import '../models/restaurant.dart';
+import '../state/app_state_scope.dart';
+import '../state/cart_manager.dart';
+import '../state/theme_manager.dart';
 
 class RestaurantPage extends StatefulWidget {
   final Restaurant restaurant;
 
-  const RestaurantPage({
-    super.key,
-    required this.restaurant,
-  });
+  const RestaurantPage({super.key, required this.restaurant});
 
   @override
   State<RestaurantPage> createState() => _RestaurantPageState();
@@ -19,10 +23,13 @@ class _RestaurantPageState extends State<RestaurantPage> {
   static const desktopThreshold = 700;
   static const double largeScreenPercentage = 0.9;
   static const double maxWidth = 1000;
+  Timer? _checkoutBarTimer;
+  bool _showCheckoutBar = false;
 
   double _calculateConstrainedWidth(double screenWidth) {
     return (screenWidth > desktopThreshold
-            ? screenWidth * largeScreenPercentage //
+            ? screenWidth *
+                  largeScreenPercentage //
             : screenWidth)
         .clamp(0.0, maxWidth);
   }
@@ -49,25 +56,38 @@ class _RestaurantPageState extends State<RestaurantPage> {
       expandedHeight: 300.0,
       backgroundColor: Colors.transparent,
       surfaceTintColor: Colors.transparent,
+      leading: Builder(
+        builder: (context) => IconButton(
+          icon: const Icon(Icons.menu),
+          onPressed: () => Scaffold.of(context).openDrawer(),
+        ),
+      ),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).maybePop(),
+        ),
+      ],
       flexibleSpace: FlexibleSpaceBar(
         // Large visual header to highlight rental provider branding.
         background: Center(
           child: Padding(
-            padding: const EdgeInsets.only(
-              left: 16.0,
-              right: 16.0,
-              top: 64.0,
-            ),
+            padding: const EdgeInsets.only(left: 16.0, right: 16.0, top: 64.0),
             child: Stack(
               children: [
                 Container(
                   margin: const EdgeInsets.only(bottom: 30.0),
-                  decoration: BoxDecoration(
-                    color: Colors.grey,
-                    borderRadius: BorderRadius.circular(24.0),
-                    image: DecorationImage(
-                      image: AssetImage(widget.restaurant.imageUrl),
-                      fit: BoxFit.cover,
+                  child: Hero(
+                    tag: 'car_image_${widget.restaurant.id}',
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.grey,
+                        borderRadius: BorderRadius.circular(24.0),
+                        image: DecorationImage(
+                          image: AssetImage(widget.restaurant.imageUrl),
+                          fit: BoxFit.cover,
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -76,10 +96,7 @@ class _RestaurantPageState extends State<RestaurantPage> {
                   left: 16.0,
                   child: CircleAvatar(
                     radius: 30,
-                    child: Icon(
-                      Icons.directions_car,
-                      color: Colors.white,
-                    ),
+                    child: Icon(Icons.directions_car, color: Colors.white),
                   ),
                 ),
               ],
@@ -106,20 +123,11 @@ class _RestaurantPageState extends State<RestaurantPage> {
               ),
             ),
             const SizedBox(height: 4),
-            Text(
-              restaurant.address,
-              style: textTheme.bodySmall,
-            ),
+            Text(restaurant.address, style: textTheme.bodySmall),
             const SizedBox(height: 2),
-            Text(
-              restaurant.getRatingAndDistance(),
-              style: textTheme.bodySmall,
-            ),
+            Text(restaurant.getRatingAndDistance(), style: textTheme.bodySmall),
             const SizedBox(height: 8),
-            Text(
-              restaurant.attributes,
-              style: textTheme.labelMedium,
-            ),
+            Text(restaurant.attributes, style: textTheme.labelMedium),
           ],
         ),
       ),
@@ -132,7 +140,120 @@ class _RestaurantPageState extends State<RestaurantPage> {
       onTap: () {
         // Keep this hook for future booking action/details.
       },
-      child: RestaurantItem(item: item),
+      child: RestaurantItem(
+        item: item,
+        onBook: (rentalDays, withInsurance, withDriver, total) {
+          final cart = AppStateScope.of(context).cart;
+          cart.add(
+            item: item,
+            restaurant: widget.restaurant,
+            bookingConfig: CartBookingConfig(
+              rentalDays: rentalDays,
+              withInsurance: withInsurance,
+              withDriver: withDriver,
+              totalPrice: total,
+            ),
+          );
+          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          _showCheckoutSummaryBar();
+        },
+      ),
+    );
+  }
+
+  void _showCheckoutSummaryBar() {
+    _checkoutBarTimer?.cancel();
+    setState(() => _showCheckoutBar = true);
+    _checkoutBarTimer = Timer(
+      const Duration(seconds: 4),
+      _hideCheckoutSummaryBar,
+    );
+  }
+
+  void _hideCheckoutSummaryBar() {
+    _checkoutBarTimer?.cancel();
+    if (mounted) {
+      setState(() => _showCheckoutBar = false);
+    }
+  }
+
+  Widget _buildCheckoutSummaryBar() {
+    final cart = AppStateScope.of(context).cart;
+    final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return AnimatedSlide(
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOut,
+      offset: _showCheckoutBar ? Offset.zero : const Offset(0, 1),
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 250),
+        opacity: _showCheckoutBar ? 1 : 0,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: GestureDetector(
+            onVerticalDragEnd: (details) {
+              if ((details.primaryVelocity ?? 0) > 350) {
+                _hideCheckoutSummaryBar();
+              }
+            },
+            onTap: () async {
+              _hideCheckoutSummaryBar();
+              await CheckoutSheet.show(context);
+            },
+            child: Material(
+              elevation: 4,
+              color: colorScheme.primaryContainer,
+              borderRadius: BorderRadius.circular(18),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
+                child: AnimatedBuilder(
+                  animation: cart,
+                  builder: (context, _) => Row(
+                    children: [
+                      Icon(
+                        Icons.shopping_bag_outlined,
+                        color: colorScheme.onPrimaryContainer,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Added to checkout',
+                              style: textTheme.titleSmall?.copyWith(
+                                color: colorScheme.onPrimaryContainer,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            Text(
+                              '${cart.totalItems} item(s) · \$${cart.totalPrice.toStringAsFixed(0)}',
+                              style: textTheme.bodySmall?.copyWith(
+                                color: colorScheme.onPrimaryContainer,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Text(
+                        'Swipe down to dismiss',
+                        style: textTheme.labelSmall?.copyWith(
+                          color: colorScheme.onPrimaryContainer,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -141,9 +262,9 @@ class _RestaurantPageState extends State<RestaurantPage> {
       padding: const EdgeInsets.all(8.0),
       child: Text(
         title,
-        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
+        style: Theme.of(
+          context,
+        ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
       ),
     );
   }
@@ -171,10 +292,7 @@ class _RestaurantPageState extends State<RestaurantPage> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _sectionTitle(title),
-            _buildGridView(columns),
-          ],
+          children: [_sectionTitle(title), _buildGridView(columns)],
         ),
       ),
     );
@@ -246,8 +364,7 @@ class _RestaurantPageState extends State<RestaurantPage> {
                                 ),
                                 Text(
                                   '${review.rating.toStringAsFixed(1)} ★',
-                                  style:
-                                      Theme.of(context).textTheme.bodySmall,
+                                  style: Theme.of(context).textTheme.bodySmall,
                                 ),
                               ],
                             ),
@@ -279,14 +396,71 @@ class _RestaurantPageState extends State<RestaurantPage> {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final constrainedWidth = _calculateConstrainedWidth(screenWidth);
+    final themeManager = ThemeManagerScope.of(context);
 
     return Scaffold(
+      drawer: NavigationDrawer(
+        onDestinationSelected: (index) {
+          Navigator.pop(context);
+          if (index == 0) context.go('/explore');
+          if (index == 1) context.go('/orders');
+          if (index == 2) context.go('/account');
+        },
+        children: [
+          const SizedBox(height: 12),
+          const NavigationDrawerDestination(
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home),
+            label: Text('Explore'),
+          ),
+          const NavigationDrawerDestination(
+            icon: Icon(Icons.list_outlined),
+            selectedIcon: Icon(Icons.list),
+            label: Text('Orders'),
+          ),
+          const NavigationDrawerDestination(
+            icon: Icon(Icons.person_2_outlined),
+            selectedIcon: Icon(Icons.person),
+            label: Text('Account'),
+          ),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.logout),
+            title: const Text('Logout'),
+            onTap: () {
+              Navigator.pop(context);
+              AppStateScope.of(context).user.logout();
+            },
+          ),
+          SwitchListTile.adaptive(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 28),
+            secondary: const Icon(Icons.dark_mode),
+            title: const Text('Dark Mode'),
+            value: themeManager.isDarkMode,
+            onChanged: themeManager.setDarkMode,
+          ),
+        ],
+      ),
       body: Center(
-        child: SizedBox(
-          width: constrainedWidth,
-          child: _buildCustomScrollView(),
+        child: Stack(
+          children: [
+            SizedBox(width: constrainedWidth, child: _buildCustomScrollView()),
+            Align(
+              alignment: Alignment.bottomCenter,
+              child: IgnorePointer(
+                ignoring: !_showCheckoutBar,
+                child: _buildCheckoutSummaryBar(),
+              ),
+            ),
+          ],
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _checkoutBarTimer?.cancel();
+    super.dispose();
   }
 }

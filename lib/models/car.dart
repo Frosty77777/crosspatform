@@ -1,40 +1,18 @@
-class Car {
-  String id;
-  String name;
-  String brand;
-  double pricePerDay;
-  double rating;
-  String imageUrl;
-  String description;
+import 'package:freezed_annotation/freezed_annotation.dart';
 
-  Car(
-    this.id,
-    this.name,
-    this.brand,
-    this.pricePerDay,
-    this.rating,
-    this.imageUrl,
-    this.description,
-  );
+part 'car.freezed.dart';
+part 'car.g.dart';
+
+@freezed
+sealed class Car with _$Car {
+  const factory Car({
+    required String id,
+    required String name,
+    required String brand,
+    required double price,
+    required String imageUrl,
+    required String description,
+  }) = _Car;
+
+  factory Car.fromJson(Map<String, dynamic> json) => _$CarFromJson(json);
 }
-
-List<Car> cars = [
-  Car(
-    '1',
-    'Model S',
-    'Tesla',
-    120,
-    4.8,
-    'assets/cars/tesla.png',
-    'Electric luxury sedan',
-  ),
-  Car(
-    '2',
-    'Civic',
-    'Honda',
-    60,
-    4.5,
-    'assets/cars/civic.png',
-    'Reliable compact car',
-  ),
-];

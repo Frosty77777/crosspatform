@@ -1,0 +1,52 @@
+{
+  "cars": [
+    {
+      "id": "tesla_model_3",
+      "name": "Tesla Model 3",
+      "brand": "cashauto rent",
+      "price": 120.0,
+      "imageUrl": "https://images.unsplash.com/photo-1560958089-b8a1929cea89",
+      "description": "Electric sedan, autopilot, premium interior."
+    },
+    {
+      "id": "toyota_corolla",
+      "name": "Toyota Corolla",
+      "brand": "cashauto rent",
+      "price": 55.0,
+      "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/f/f6/Toyota_Corolla_Limousine_Hybrid_Genf_2019_1Y7A5576.jpg",
+      "description": "Fuel efficient compact car, perfect for city travel."
+    },
+    {
+      "id": "bmw_x5",
+      "name": "BMW X5",
+      "brand": "cashauto rent",
+      "price": 145.0,
+      "imageUrl": "https://hips.hearstapps.com/hmg-prod/images/2024-bmw-x5-m60i-134-6602d491051b2.jpg?crop=0.686xw:0.514xh;0.152xw,0.341xh&resize=1200:*",
+      "description": "Luxury SUV with spacious cabin and strong performance."
+    },
+    {
+      "id": "honda_civic",
+      "name": "Honda Civic",
+      "brand": "Urban Auto",
+      "price": 60.0,
+      "imageUrl": "https://jdmenginezone.com/cdn/shop/articles/Honda_Civic_Type_R__FK__France__front_view_3edb2843-93c6-4601-9a77-4c01767a5cb6.jpg?v=1690241945",
+      "description": "Reliable compact sedan with modern safety features."
+    },
+    {
+      "id": "hyundai_tucson",
+      "name": "Hyundai Tucson",
+      "brand": "Urban Auto",
+      "price": 85.0,
+      "imageUrl": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRqRKwHAxwD9IzyRRWodXcQ96yTK1BkeLjBJA&s",
+      "description": "Comfortable SUV for family road trips."
+    },
+    {
+      "id": "ford_mustang",
+      "name": "Ford Mustang",
+      "brand": "Urban Auto",
+      "price": 130.0,
+      "imageUrl": "https://s.auto.drom.ru/img4/catalog/photos/fullsize/ford/mustang/ford_mustang_120501.jpg",
+      "description": "Sporty coupe for weekend drives and special occasions."
+    }
+  ]
+}

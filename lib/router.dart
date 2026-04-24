@@ -1,51 +1,76 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../screens/explore_page.dart';
-import '../screens/bookings_page.dart';
-import '../screens/restaurant_page.dart';
-import '../screens/chapter7_widgets_page.dart';
-import '../models/restaurant.dart';
+import 'components/checkout_sheet.dart';
+import 'screens/explore_page.dart';
+import 'screens/account_page.dart';
+import 'screens/login_page.dart';
+import 'screens/orders_page.dart';
+import 'screens/restaurant_page.dart';
+import 'models/restaurant.dart';
+import 'state/app_state_scope.dart';
+import 'state/cart_manager.dart';
+import 'state/order_manager.dart';
+import 'state/theme_manager.dart';
+import 'state/user_manager.dart';
 
 /// Chapter 8 — go_router configuration
 ///
 /// ShellRoute keeps the bottom NavigationBar alive during sub-navigation.
 /// The 'redirect' callback is a stub — replace with your real auth check.
 
+final _userManager = UserManager();
+final _cartManager = CartManager();
+final _orderManager = OrderManager();
+final _appState = AppState(
+  user: _userManager,
+  cart: _cartManager,
+  orders: _orderManager,
+);
+
 final appRouter = GoRouter(
   initialLocation: '/',
   debugLogDiagnostics: true,
+  refreshListenable: _userManager,
 
   // ── auth guard (stub) ────────────────────────────────────────────────────
   redirect: (context, state) {
-    // Replace with real auth: if (!AuthService.isLoggedIn) return '/login';
+    final loggingIn = state.matchedLocation == '/login';
+    if (!_userManager.isLoggedIn) {
+      return loggingIn ? null : '/login';
+    }
+    if (loggingIn) return '/explore';
     return null;
   },
 
   routes: [
+    GoRoute(
+      path: '/login',
+      name: 'login',
+      builder: (context, state) =>
+          AppStateScope(state: _appState, child: const LoginPage()),
+    ),
     // ── Shell keeps BottomNavigationBar / Drawer alive ────────────────────
     ShellRoute(
-      builder: (context, state, child) => AppShell(child: child),
+      builder: (context, state, child) => AppStateScope(
+        state: _appState,
+        child: AppShell(location: state.uri.path, child: child),
+      ),
       routes: [
         GoRoute(
-          path: '/',
+          path: '/explore',
           name: 'explore',
           builder: (context, state) => ExplorePage(),
         ),
         GoRoute(
-          path: '/bookings',
-          name: 'bookings',
-          builder: (context, state) => const BookingsPage(),
+          path: '/orders',
+          name: 'orders',
+          builder: (context, state) => const OrdersPage(),
         ),
         GoRoute(
           path: '/account',
           name: 'account',
           builder: (context, state) => const AccountPage(),
-        ),
-        GoRoute(
-          path: '/widgets-demo',
-          name: 'widgets-demo',
-          builder: (_, __) => const Chapter7WidgetsPage(),
         ),
       ],
     ),
@@ -54,13 +79,16 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/restaurant/:id',
       name: 'restaurant',
-      builder: (_, state) {
+      builder: (context, state) {
         final id = state.pathParameters['id']!;
         final restaurant = restaurants.firstWhere(
           (r) => r.id == id,
           orElse: () => restaurants.first,
         );
-        return RestaurantPage(restaurant: restaurant);
+        return AppStateScope(
+          state: _appState,
+          child: RestaurantPage(restaurant: restaurant),
+        );
       },
     ),
   ],
@@ -72,10 +100,11 @@ final appRouter = GoRouter(
 
 class AppShell extends StatelessWidget {
   final Widget child;
-  const AppShell({super.key, required this.child});
+  final String location;
+  const AppShell({super.key, required this.child, required this.location});
 
   // Map each tab path to a numeric index
-  static const _tabs = ['/', '/bookings', '/account'];
+  static const _tabs = ['/explore', '/orders', '/account'];
 
   int _locationToIndex(String location) {
     final idx = _tabs.indexWhere((t) => location.startsWith(t));
@@ -84,8 +113,9 @@ class AppShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final location = GoRouterState.of(context).uri.toString();
     final currentIndex = _locationToIndex(location);
+    final cart = AppStateScope.of(context).cart;
+    final themeManager = ThemeManagerScope.of(context);
 
     return Scaffold(
       // ── AppBar ──────────────────────────────────────────────────────────
@@ -103,14 +133,7 @@ class AppShell extends StatelessWidget {
             onPressed: () => Scaffold.of(ctx).openDrawer(),
           ),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.widgets_outlined),
-            tooltip: 'Ch.7 Widget Demo',
-            onPressed: () => context.go('/widgets-demo'),
-          ),
-          const SizedBox(width: 8),
-        ],
+        actions: [const SizedBox(width: 8)],
       ),
 
       // ── Navigation Drawer (sidebar) ─────────────────────────────────────
@@ -129,18 +152,25 @@ class AppShell extends StatelessWidget {
               children: [
                 CircleAvatar(
                   radius: 28,
-                  backgroundColor:
-                      Theme.of(context).colorScheme.primaryContainer,
-                  child: Icon(Icons.directions_car,
-                      color: Theme.of(context).colorScheme.primary),
+                  backgroundColor: Theme.of(
+                    context,
+                  ).colorScheme.primaryContainer,
+                  child: Icon(
+                    Icons.directions_car,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
                 ),
                 const SizedBox(height: 12),
-                Text('Car Rent',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        )),
-                Text('Find your perfect ride',
-                    style: Theme.of(context).textTheme.labelSmall),
+                Text(
+                  'Car Rent',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Text(
+                  'Find your perfect ride',
+                  style: Theme.of(context).textTheme.labelSmall,
+                ),
               ],
             ),
           ),
@@ -153,7 +183,7 @@ class AppShell extends StatelessWidget {
           const NavigationDrawerDestination(
             icon: Icon(Icons.list_outlined),
             selectedIcon: Icon(Icons.list),
-            label: Text('Bookings'),
+            label: Text('Orders'),
           ),
           const NavigationDrawerDestination(
             icon: Icon(Icons.person_2_outlined),
@@ -161,25 +191,27 @@ class AppShell extends StatelessWidget {
             label: Text('Account'),
           ),
           const Divider(),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 4),
-            child: Text('More',
-                style: Theme.of(context).textTheme.labelSmall),
-          ),
-          ListTile(
-            leading: const Icon(Icons.widgets_outlined),
-            title: const Text('Widget Demo'),
-            onTap: () {
-              Navigator.pop(context);
-              context.go('/widgets-demo');
-            },
-            contentPadding: const EdgeInsets.symmetric(horizontal: 28),
-          ),
           ListTile(
             leading: const Icon(Icons.settings_outlined),
             title: const Text('Settings'),
             onTap: () => Navigator.pop(context),
             contentPadding: const EdgeInsets.symmetric(horizontal: 28),
+          ),
+          ListTile(
+            leading: const Icon(Icons.logout),
+            title: const Text('Logout'),
+            onTap: () {
+              Navigator.pop(context);
+              AppStateScope.of(context).user.logout();
+            },
+            contentPadding: const EdgeInsets.symmetric(horizontal: 28),
+          ),
+          SwitchListTile.adaptive(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 28),
+            secondary: const Icon(Icons.dark_mode),
+            title: const Text('Dark Mode'),
+            value: themeManager.isDarkMode,
+            onChanged: themeManager.setDarkMode,
           ),
         ],
       ),
@@ -188,6 +220,15 @@ class AppShell extends StatelessWidget {
       body: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8),
         child: child,
+      ),
+
+      floatingActionButton: AnimatedBuilder(
+        animation: cart,
+        builder: (context, _) => FloatingActionButton.extended(
+          onPressed: () => CheckoutSheet.show(context),
+          icon: const Icon(Icons.shopping_cart_outlined),
+          label: Text('Cart (${cart.totalItems})'),
+        ),
       ),
 
       // ── Bottom NavigationBar ────────────────────────────────────────────
@@ -207,7 +248,7 @@ class AppShell extends StatelessWidget {
               NavigationDestination(
                 icon: Icon(Icons.list_outlined),
                 selectedIcon: Icon(Icons.list),
-                label: 'Bookings',
+                label: 'Orders',
               ),
               NavigationDestination(
                 icon: Icon(Icons.person_2_outlined),

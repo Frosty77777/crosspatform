@@ -1,33 +1,72 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../models/car_catalog.dart';
 import '../models/restaurant.dart';
+import '../state/favorites_notifier.dart';
 
 /// Full-detail bottom sheet for a single rental car.
 /// Shows image, specs, characteristics and a Book Now button.
-class CarDetailSheet extends StatefulWidget {
+class CarDetailSheet extends ConsumerStatefulWidget {
   final Item item;
-  const CarDetailSheet({super.key, required this.item});
+  final void Function(
+    int rentalDays,
+    bool withInsurance,
+    bool withDriver,
+    double total,
+  )?
+  onBook;
+  const CarDetailSheet({super.key, required this.item, this.onBook});
 
-  static void show(BuildContext context, Item item) {
+  static void show(
+    BuildContext context,
+    Item item, {
+    void Function(
+      int rentalDays,
+      bool withInsurance,
+      bool withDriver,
+      double total,
+    )?
+    onBook,
+  }) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => CarDetailSheet(item: item),
+      builder: (_) => CarDetailSheet(item: item, onBook: onBook),
     );
   }
 
   @override
-  State<CarDetailSheet> createState() => _CarDetailSheetState();
+  ConsumerState<CarDetailSheet> createState() => _CarDetailSheetState();
 }
 
-class _CarDetailSheetState extends State<CarDetailSheet> {
+class _CarDetailSheetState extends ConsumerState<CarDetailSheet> {
   int _rentalDays = 1;
   bool _withInsurance = false;
   bool _withDriver = false;
-  bool _isFavorited = false;
+  late double _previousTotal;
+  late final String _carId;
 
   double get _total =>
-      widget.item.price * _rentalDays + (_withInsurance ? 15 * _rentalDays : 0) + (_withDriver ? 40 * _rentalDays : 0);
+      widget.item.price * _rentalDays +
+      (_withInsurance ? 15 * _rentalDays : 0) +
+      (_withDriver ? 40 * _rentalDays : 0);
+
+  @override
+  void initState() {
+    super.initState();
+    _previousTotal = _total;
+    _carId = carIdFromItem(widget.item);
+  }
+
+  void _setBookingState(VoidCallback change) {
+    setState(() {
+      _previousTotal = _total;
+      change();
+    });
+  }
 
   // Derive simple specs from the item name so no model changes are needed
   Map<String, String> get _specs {
@@ -81,32 +120,15 @@ class _CarDetailSheetState extends State<CarDetailSheet> {
   }
 
   void _confirmBooking() {
+    HapticFeedback.mediumImpact();
+    widget.onBook?.call(_rentalDays, _withInsurance, _withDriver, _total);
     Navigator.pop(context);
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Row(children: [
-          Icon(Icons.check_circle, color: Colors.green),
-          SizedBox(width: 8),
-          Text('Booking confirmed!'),
-        ]),
-        content: Text(
-          'You booked the ${widget.item.name} for $_rentalDays day(s).\n'
-          'Total: \$${_total.toStringAsFixed(0)}',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final favoriteIds = ref.watch(favoritesProvider).value ?? <String>{};
+    final isFavorited = favoriteIds.contains(_carId);
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
 
@@ -146,7 +168,7 @@ class _CarDetailSheetState extends State<CarDetailSheet> {
                     child: Image.network(
                       widget.item.imageUrl,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
+                      errorBuilder: (context, error, stackTrace) => Container(
                         color: cs.surfaceContainerLow,
                         child: const Icon(Icons.directions_car, size: 64),
                       ),
@@ -157,7 +179,9 @@ class _CarDetailSheetState extends State<CarDetailSheet> {
                   top: 10,
                   right: 10,
                   child: GestureDetector(
-                    onTap: () => setState(() => _isFavorited = !_isFavorited),
+                    onTap: () => ref
+                        .read(favoritesProvider.notifier)
+                        .toggleFavorite(_carId),
                     child: Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
@@ -165,8 +189,8 @@ class _CarDetailSheetState extends State<CarDetailSheet> {
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
-                        _isFavorited ? Icons.favorite : Icons.favorite_border,
-                        color: Colors.white,
+                        isFavorited ? Icons.favorite : Icons.favorite_border,
+                        color: isFavorited ? Colors.redAccent : Colors.white,
                         size: 20,
                       ),
                     ),
@@ -181,9 +205,12 @@ class _CarDetailSheetState extends State<CarDetailSheet> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
-                  child: Text(widget.item.name,
-                      style: tt.headlineSmall
-                          ?.copyWith(fontWeight: FontWeight.w700)),
+                  child: Text(
+                    widget.item.name,
+                    style: tt.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
@@ -191,7 +218,9 @@ class _CarDetailSheetState extends State<CarDetailSheet> {
                     Text(
                       '\$${widget.item.price.toStringAsFixed(0)}',
                       style: tt.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.w700, color: cs.primary),
+                        fontWeight: FontWeight.w700,
+                        color: cs.primary,
+                      ),
                     ),
                     Text('per day', style: tt.labelSmall),
                   ],
@@ -203,8 +232,10 @@ class _CarDetailSheetState extends State<CarDetailSheet> {
             const SizedBox(height: 20),
 
             // ── characteristics grid ───────────────────────────────────
-            Text('Characteristics',
-                style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+            Text(
+              'Characteristics',
+              style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+            ),
             const SizedBox(height: 12),
             GridView.count(
               shrinkWrap: true,
@@ -220,46 +251,60 @@ class _CarDetailSheetState extends State<CarDetailSheet> {
             const SizedBox(height: 24),
 
             // ── rental days picker ─────────────────────────────────────
-            Text('Rental duration',
-                style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+            Text(
+              'Rental duration',
+              style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+            ),
             const SizedBox(height: 12),
-            Row(children: [
-              IconButton.outlined(
-                onPressed: _rentalDays > 1
-                    ? () => setState(() => _rentalDays--)
-                    : null,
-                icon: const Icon(Icons.remove),
-              ),
-              const SizedBox(width: 12),
-              Text('$_rentalDays day${_rentalDays > 1 ? 's' : ''}',
-                  style: tt.titleMedium),
-              const SizedBox(width: 12),
-              IconButton.outlined(
-                onPressed: _rentalDays < 30
-                    ? () => setState(() => _rentalDays++)
-                    : null,
-                icon: const Icon(Icons.add),
-              ),
-            ]),
+            Row(
+              children: [
+                IconButton.outlined(
+                  onPressed: _rentalDays > 1
+                      ? () => _setBookingState(() => _rentalDays--)
+                      : null,
+                  icon: const Icon(Icons.remove),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  '$_rentalDays day${_rentalDays > 1 ? 's' : ''}',
+                  style: tt.titleMedium,
+                ),
+                const SizedBox(width: 12),
+                IconButton.outlined(
+                  onPressed: _rentalDays < 30
+                      ? () => _setBookingState(() => _rentalDays++)
+                      : null,
+                  icon: const Icon(Icons.add),
+                ),
+              ],
+            ),
             const SizedBox(height: 20),
 
             // ── add-ons ────────────────────────────────────────────────
-            Text('Add-ons',
-                style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+            Text(
+              'Add-ons',
+              style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+            ),
             const SizedBox(height: 8),
             _AddonTile(
               icon: Icons.shield_outlined,
               title: 'Full insurance',
               subtitle: '+\$15/day',
               value: _withInsurance,
-              onChanged: (v) => setState(() => _withInsurance = v),
+              onChanged: (v) {
+                HapticFeedback.lightImpact();
+                _setBookingState(() => _withInsurance = v);
+              },
             ),
             _AddonTile(
               icon: Icons.person_outline,
               title: 'Personal driver',
               subtitle: '+\$40/day',
               value: _withDriver,
-              onChanged: (v) => setState(() => _withDriver = v),
+              onChanged: (v) {
+                HapticFeedback.lightImpact();
+                _setBookingState(() => _withDriver = v);
+              },
             ),
             const SizedBox(height: 24),
 
@@ -276,19 +321,32 @@ class _CarDetailSheetState extends State<CarDetailSheet> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Total',
-                            style: tt.labelMedium
-                                ?.copyWith(color: cs.onPrimaryContainer)),
                         Text(
-                          '\$${_total.toStringAsFixed(0)}',
-                          style: tt.headlineMedium?.copyWith(
+                          'Total',
+                          style: tt.labelMedium?.copyWith(
+                            color: cs.onPrimaryContainer,
+                          ),
+                        ),
+                        TweenAnimationBuilder<double>(
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeOut,
+                          tween: Tween<double>(
+                            begin: _previousTotal,
+                            end: _total,
+                          ),
+                          builder: (context, value, child) => Text(
+                            '\$${value.toStringAsFixed(0)}',
+                            style: tt.headlineMedium?.copyWith(
                               fontWeight: FontWeight.w700,
-                              color: cs.onPrimaryContainer),
+                              color: cs.onPrimaryContainer,
+                            ),
+                          ),
                         ),
                         Text(
                           'for $_rentalDays day${_rentalDays > 1 ? 's' : ''}',
-                          style: tt.labelSmall
-                              ?.copyWith(color: cs.onPrimaryContainer),
+                          style: tt.labelSmall?.copyWith(
+                            color: cs.onPrimaryContainer,
+                          ),
                         ),
                       ],
                     ),
@@ -299,7 +357,9 @@ class _CarDetailSheetState extends State<CarDetailSheet> {
                     label: const Text('Book Now'),
                     style: FilledButton.styleFrom(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 24, vertical: 16),
+                        horizontal: 24,
+                        vertical: 16,
+                      ),
                     ),
                   ),
                 ],
@@ -331,21 +391,23 @@ class _SpecCard extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(value,
-              style: Theme.of(context)
-                  .textTheme
-                  .labelLarge
-                  ?.copyWith(fontWeight: FontWeight.w700),
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis),
+          Text(
+            value,
+            style: Theme.of(
+              context,
+            ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
           const SizedBox(height: 2),
-          Text(label,
-              style: Theme.of(context)
-                  .textTheme
-                  .labelSmall
-                  ?.copyWith(color: cs.onSurfaceVariant),
-              textAlign: TextAlign.center),
+          Text(
+            label,
+            style: Theme.of(
+              context,
+            ).textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+            textAlign: TextAlign.center,
+          ),
         ],
       ),
     );
@@ -359,12 +421,13 @@ class _AddonTile extends StatelessWidget {
   final String subtitle;
   final bool value;
   final ValueChanged<bool> onChanged;
-  const _AddonTile(
-      {required this.icon,
-      required this.title,
-      required this.subtitle,
-      required this.value,
-      required this.onChanged});
+  const _AddonTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.onChanged,
+  });
 
   @override
   Widget build(BuildContext context) {

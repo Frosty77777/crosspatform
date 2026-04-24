@@ -5,8 +5,9 @@ import 'car_detail_sheet.dart';
 
 class RestaurantItem extends StatelessWidget {
   final Item item;
+  final void Function(int rentalDays, bool withInsurance, bool withDriver, double total)? onBook;
 
-  const RestaurantItem({super.key, required this.item});
+  const RestaurantItem({super.key, required this.item, this.onBook});
 
   @override
   Widget build(BuildContext context) {
@@ -15,7 +16,7 @@ class RestaurantItem extends StatelessWidget {
     // Wrap the whole card in InkWell so tapping anywhere opens the detail sheet
     return InkWell(
       borderRadius: BorderRadius.circular(16),
-      onTap: () => CarDetailSheet.show(context, item),
+      onTap: () => CarDetailSheet.show(context, item, onBook: onBook),
       child: Container(
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
@@ -89,7 +90,7 @@ class RestaurantItem extends StatelessWidget {
           child: Image.network(
             item.imageUrl,
             fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => Container(
+            errorBuilder: (context, error, stackTrace) => Container(
               color: Colors.grey.shade200,
               child: const Icon(Icons.directions_car),
             ),
@@ -104,7 +105,7 @@ class RestaurantItem extends StatelessWidget {
       bottom: 8.0,
       right: 8.0,
       child: GestureDetector(
-        onTap: () => CarDetailSheet.show(context, item),
+        onTap: () => CarDetailSheet.show(context, item, onBook: onBook),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
           decoration: BoxDecoration(

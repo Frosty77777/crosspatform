@@ -10,11 +10,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:untitled2/main.dart';
 
 void main() {
-  testWidgets('App renders car rent home', (WidgetTester tester) async {
+  testWidgets('App shows login on launch', (WidgetTester tester) async {
     await tester.pumpWidget(const CarRent());
+    await tester.pumpAndSettle();
 
-    expect(find.text('Car Rent'), findsOneWidget);
-    expect(find.text('Explore'), findsOneWidget);
-    expect(find.text('Bookings'), findsOneWidget);
+    expect(find.text('Welcome back'), findsOneWidget);
+    expect(find.text('Login'), findsOneWidget);
   });
 }
