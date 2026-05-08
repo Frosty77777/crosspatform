@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'components/checkout_sheet.dart';
@@ -13,6 +14,7 @@ import 'state/cart_manager.dart';
 import 'state/order_manager.dart';
 import 'state/theme_manager.dart';
 import 'state/user_manager.dart';
+import 'providers/weather_providers.dart';
 
 /// Chapter 8 — go_router configuration
 ///
@@ -212,6 +214,86 @@ class AppShell extends StatelessWidget {
             title: const Text('Dark Mode'),
             value: themeManager.isDarkMode,
             onChanged: themeManager.setDarkMode,
+          ),
+          const SizedBox(height: 12),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16),
+            child: Divider(),
+          ),
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 18),
+              child: Consumer(
+                builder: (context, ref, child) {
+                  final weatherAsync = ref.watch(weatherProvider);
+                  final textTheme = Theme.of(context).textTheme;
+                  final colorScheme = Theme.of(context).colorScheme;
+
+                  return weatherAsync.when(
+                    loading: () => const SizedBox(
+                      height: 40,
+                      child: Center(
+                        child: SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      ),
+                    ),
+                    error: (error, stackTrace) => Text(
+                      'Weather unavailable',
+                      style: textTheme.bodySmall,
+                    ),
+                    data: (weather) => Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: colorScheme.surfaceContainerHighest.withValues(
+                          alpha: 0.5,
+                        ),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: colorScheme.outlineVariant.withValues(
+                            alpha: 0.45,
+                          ),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Image.network(
+                            'https://openweathermap.org/img/wn/${weather.icon}@2x.png',
+                            width: 36,
+                            height: 36,
+                            errorBuilder: (context, error, stackTrace) =>
+                                const Icon(Icons.cloud_outlined),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '${weather.cityName}: ${weather.temp.round()}°C',
+                                  style: textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                Text(
+                                  weather.description,
+                                  style: textTheme.bodySmall,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
           ),
         ],
       ),

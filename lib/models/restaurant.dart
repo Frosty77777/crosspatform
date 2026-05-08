@@ -62,9 +62,9 @@ class Restaurant {
 List<Restaurant> restaurants = [
   Restaurant(
     '0',
-    'cashauto rent',
+    'CashAuto Rent',
     'Zhaidarman2/1',
-    'Sedan, SUV, Luxury',
+    'Premium sedans, luxury SUVs, executive pickup',
     'assets/restaurants/blacklogo.webp',
     1.2,
     4.8,
@@ -119,7 +119,7 @@ List<Restaurant> restaurants = [
     '1',
     'Urban Auto',
     'Mangilik el 23',
-    'Budget, Family, Long Trip',
+    'Budget-friendly rentals, family cars, long-trip comfort',
     'assets/restaurants/img.png',
     0.9,
     4.6,

@@ -38,10 +38,17 @@ class RestaurantLandscapeCard extends ConsumerWidget {
                   // Brand/storefront image for this rental provider.
                   Hero(
                     tag: 'car_image_${restaurant.id}',
-                    child: Image.asset(
-                      restaurant.imageUrl,
-                      fit: BoxFit.cover,
-                    ),
+                    child: restaurant.imageUrl.startsWith('http')
+                        ? Image.network(
+                            restaurant.imageUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) =>
+                                const Center(child: Icon(Icons.directions_car)),
+                          )
+                        : Image.asset(
+                            restaurant.imageUrl,
+                            fit: BoxFit.cover,
+                          ),
                   ),
                   Positioned(
                     top: 10.0,
