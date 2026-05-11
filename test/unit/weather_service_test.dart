@@ -1,13 +1,10 @@
-// Chapter 18 — Mocking an HTTP service.
+// Unit tests for `WeatherService` — mocked HTTP.
 //
-// WeatherService calls api.openweathermap.org. We cannot rely on the
-// real network in unit tests (slow, flaky, may be offline, and we don't
-// want to leak the API key in CI logs).
+// `WeatherService` reaches a real API in production. To test it we
+// inject a `MockClient` from `package:http/testing.dart`. No network
+// call is performed and no API key is exposed.
 //
-// Solution: inject a `MockClient` from `package:http/testing.dart`.
-// MockClient lets us register a handler that returns whatever response
-// body / status code we want — the service code path is exercised, but
-// no real network call is made.
+// All test bodies follow Arrange / Act / Assert.
 
 import 'dart:convert';
 
@@ -18,73 +15,85 @@ import 'package:http/testing.dart';
 import 'package:untitled2/services/weather_service.dart';
 
 void main() {
-  group('WeatherService.fetchWeather (mocked HTTP)', () {
-    test('parses a successful 200 response into a Weather object', () async {
-      final mockClient = MockClient((request) async {
-        // Assert the service is hitting the expected endpoint.
-        expect(request.url.host, 'api.openweathermap.org');
-        expect(request.method, 'GET');
+  group('WeatherService', () {
+    group('fetchWeather()', () {
+      test('parses a successful 200 response into a Weather object',
+          () async {
+        // Arrange
+        final mockClient = MockClient((request) async {
+          expect(request.url.host, 'api.openweathermap.org');
+          expect(request.method, 'GET');
+          return http.Response(
+            jsonEncode({
+              'weather': [
+                {'description': 'clear sky', 'icon': '01d'},
+              ],
+              'main': {'temp': 21.5},
+              'name': 'Astana',
+            }),
+            200,
+          );
+        });
+        final service = WeatherService(client: mockClient);
 
-        return http.Response(
-          jsonEncode({
-            'weather': [
-              {'description': 'clear sky', 'icon': '01d'},
-            ],
-            'main': {'temp': 21.5},
-            'name': 'Astana',
-          }),
-          200,
-        );
+        // Act
+        final weather = await service.fetchWeather();
+
+        // Assert
+        expect(weather.temp, 21.5);
+        expect(weather.description, 'clear sky');
+        expect(weather.icon, '01d');
+        expect(weather.cityName, 'Astana');
       });
 
-      final service = WeatherService(client: mockClient);
-      final weather = await service.fetchWeather();
+      test('throws when the server returns a non-200 status code',
+          () async {
+        // Arrange
+        final mockClient = MockClient(
+          (request) async => http.Response('Internal Server Error', 500),
+        );
+        final service = WeatherService(client: mockClient);
 
-      expect(weather.temp, 21.5);
-      expect(weather.description, 'clear sky');
-      expect(weather.icon, '01d');
-      expect(weather.cityName, 'Astana');
-    });
+        // Act + Assert — invoking the method must throw.
+        expect(service.fetchWeather(), throwsA(isA<Exception>()));
+      });
 
-    test('throws when the server returns a non-200 status code', () async {
-      final mockClient = MockClient(
-        (request) async => http.Response('Internal Server Error', 500),
-      );
-      final service = WeatherService(client: mockClient);
-
-      expect(service.fetchWeather(), throwsA(isA<Exception>()));
-    });
-
-    test('falls back to safe defaults on missing/empty fields (edge case)',
+      test(
+        'falls back to safe defaults on missing/empty fields (edge case)',
         () async {
-      final mockClient = MockClient(
-        (_) async => http.Response(
-          jsonEncode({
-            'weather': [
-              {}, // missing description and icon
-            ],
-            'main': {}, // missing temp
-            // 'name' missing entirely
-          }),
-          200,
-        ),
+          // Arrange
+          final mockClient = MockClient(
+            (_) async => http.Response(
+              jsonEncode({
+                'weather': [<String, dynamic>{}],
+                'main': <String, dynamic>{},
+              }),
+              200,
+            ),
+          );
+          final service = WeatherService(client: mockClient);
+
+          // Act
+          final weather = await service.fetchWeather();
+
+          // Assert
+          expect(weather.temp, 0);
+          expect(weather.description, isEmpty);
+          expect(weather.icon, '01d');
+          expect(weather.cityName, 'Astana');
+        },
       );
-      final service = WeatherService(client: mockClient);
 
-      final weather = await service.fetchWeather();
+      test('throws FormatException when the body is not valid JSON',
+          () async {
+        // Arrange
+        final mockClient =
+            MockClient((_) async => http.Response('not-json', 200));
+        final service = WeatherService(client: mockClient);
 
-      expect(weather.temp, 0);
-      expect(weather.description, isEmpty);
-      expect(weather.icon, '01d', reason: 'default icon');
-      expect(weather.cityName, 'Astana', reason: 'default city');
-    });
-
-    test('throws when the body is not valid JSON', () async {
-      final mockClient =
-          MockClient((_) async => http.Response('not-json', 200));
-      final service = WeatherService(client: mockClient);
-
-      expect(service.fetchWeather(), throwsA(isA<FormatException>()));
+        // Act + Assert
+        expect(service.fetchWeather(), throwsA(isA<FormatException>()));
+      });
     });
   });
 }

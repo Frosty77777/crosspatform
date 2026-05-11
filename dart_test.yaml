@@ -1,0 +1,6 @@
+# dart_test.yaml — Chapter 18 / Part 4
+#
+# Configuration for the Dart test runner. Per the assignment, we enable
+# the flutter_test block so platform-specific tests can opt in.
+flutter_test:
+  enable: true
