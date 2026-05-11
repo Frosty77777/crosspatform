@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../models/restaurant.dart';
+import '../repositories/local_data_repository.dart';
 
 class CartEntry {
   final Item item;
@@ -39,7 +40,12 @@ class CartBookingConfig {
 }
 
 class CartManager extends ChangeNotifier {
+  final LocalDataRepository _repository;
   final Map<String, CartEntry> _entriesByItemName = {};
+
+  CartManager(this._repository) {
+    _hydrate();
+  }
 
   List<CartEntry> get entries => _entriesByItemName.values.toList()
     ..sort((a, b) => a.item.name.compareTo(b.item.name));
@@ -85,6 +91,7 @@ class CartManager extends ChangeNotifier {
         totalPrice: configuredTotal,
       );
     }
+    _persist();
     notifyListeners();
   }
 
@@ -101,12 +108,27 @@ class CartManager extends ChangeNotifier {
       existing.quantity = quantity;
       existing.totalPrice = perUnitConfiguredPrice * quantity;
     }
+    _persist();
     notifyListeners();
   }
 
   void clear() {
     _entriesByItemName.clear();
+    _persist();
     notifyListeners();
+  }
+
+  Future<void> _hydrate() async {
+    final persisted = await _repository.loadCartEntries();
+    if (persisted.isEmpty) return;
+    for (final entry in persisted) {
+      _entriesByItemName[entry.item.name] = entry;
+    }
+    notifyListeners();
+  }
+
+  void _persist() {
+    _repository.saveCartEntries(entries);
   }
 }
 

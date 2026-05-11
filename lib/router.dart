@@ -15,6 +15,7 @@ import 'state/order_manager.dart';
 import 'state/theme_manager.dart';
 import 'state/user_manager.dart';
 import 'providers/weather_providers.dart';
+import 'services/local_data_service.dart';
 
 /// Chapter 8 — go_router configuration
 ///
@@ -22,8 +23,8 @@ import 'providers/weather_providers.dart';
 /// The 'redirect' callback is a stub — replace with your real auth check.
 
 final _userManager = UserManager();
-final _cartManager = CartManager();
-final _orderManager = OrderManager();
+final _cartManager = CartManager(localDataRepository);
+final _orderManager = OrderManager(localDataRepository);
 final _appState = AppState(
   user: _userManager,
   cart: _cartManager,
@@ -202,9 +203,9 @@ class AppShell extends StatelessWidget {
           ListTile(
             leading: const Icon(Icons.logout),
             title: const Text('Logout'),
-            onTap: () {
+            onTap: () async {
               Navigator.pop(context);
-              AppStateScope.of(context).user.logout();
+              await AppStateScope.of(context).user.logout();
             },
             contentPadding: const EdgeInsets.symmetric(horizontal: 28),
           ),

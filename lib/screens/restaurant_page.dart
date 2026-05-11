@@ -6,7 +6,11 @@ import 'package:go_router/go_router.dart';
 
 import '../components/checkout_sheet.dart';
 import '../components/restaurant_item.dart';
+import '../models/car_review.dart';
+import '../models/chat_message.dart';
 import '../models/restaurant.dart';
+import '../services/chat_service.dart';
+import '../services/review_service.dart';
 import '../state/app_state_scope.dart';
 import '../state/cart_manager.dart';
 import '../state/theme_manager.dart';
@@ -26,6 +30,11 @@ class _RestaurantPageState extends State<RestaurantPage> {
   static const double maxWidth = 1000;
   Timer? _checkoutBarTimer;
   bool _showCheckoutBar = false;
+  final ReviewService _reviewService = ReviewService();
+  final ChatService _chatService = ChatService();
+  final TextEditingController _reviewController = TextEditingController();
+  final TextEditingController _chatController = TextEditingController();
+  double _pendingRating = 5;
 
   double _calculateConstrainedWidth(double screenWidth) {
     return (screenWidth > desktopThreshold
@@ -47,6 +56,7 @@ class _RestaurantPageState extends State<RestaurantPage> {
         _buildInfoSection(),
         _buildGridViewSection('Rental options'),
         _buildReviewsSection('Customer reviews'),
+        _buildSupportChatSection('Chat with support'),
       ],
     );
   }
@@ -299,37 +309,7 @@ class _RestaurantPageState extends State<RestaurantPage> {
     );
   }
 
-  /// Shows a reviewer photo: network URL, local asset, or a placeholder.
-  Widget _reviewerPhoto(Review review) {
-    const size = 44.0;
-    if (review.imageUrl.isEmpty) {
-      return CircleAvatar(
-        radius: size / 2,
-        child: const Icon(Icons.person_outline),
-      );
-    }
-    if (review.imageUrl.startsWith('http')) {
-      return ClipOval(
-        child: Image.network(
-          review.imageUrl,
-          width: size,
-          height: size,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) => CircleAvatar(
-            radius: size / 2,
-            child: const Icon(Icons.broken_image_outlined),
-          ),
-        ),
-      );
-    }
-    return CircleAvatar(
-      radius: size / 2,
-      backgroundImage: AssetImage(review.imageUrl),
-    );
-  }
-
   SliverToBoxAdapter _buildReviewsSection(String title) {
-    final reviews = widget.restaurant.reviews;
     return SliverToBoxAdapter(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
@@ -338,59 +318,236 @@ class _RestaurantPageState extends State<RestaurantPage> {
           children: [
             _sectionTitle(title),
             const SizedBox(height: 8),
-            ...reviews.map(
-              (review) => Card(
-                margin: const EdgeInsets.only(bottom: 10),
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _reviewerPhoto(review),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
+            StreamBuilder<List<CarReview>>(
+              stream: _reviewService.watchReviewsForCar(widget.restaurant.id),
+              builder: (context, snapshot) {
+                final reviews = snapshot.data ?? <CarReview>[];
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                }
+                if (snapshot.hasError) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: Text('Unable to load reviews right now.'),
+                  );
+                }
+                if (reviews.isEmpty) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: Text('No reviews yet. Be the first reviewer.'),
+                  );
+                }
+                return Column(
+                  children: reviews
+                      .map(
+                        (review) => Card(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Expanded(
+                                CircleAvatar(
+                                  radius: 22,
                                   child: Text(
-                                    review.reviewerName,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleSmall
-                                        ?.copyWith(fontWeight: FontWeight.w700),
+                                    review.userName.isNotEmpty
+                                        ? review.userName[0].toUpperCase()
+                                        : 'U',
                                   ),
                                 ),
-                                Text(
-                                  '${review.rating.toStringAsFixed(1)} ★',
-                                  style: Theme.of(context).textTheme.bodySmall,
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              review.userName,
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .titleSmall
+                                                  ?.copyWith(
+                                                    fontWeight: FontWeight.w700,
+                                                  ),
+                                            ),
+                                          ),
+                                          Text(
+                                            '${review.rating.toStringAsFixed(1)} ★',
+                                            style: Theme.of(
+                                              context,
+                                            ).textTheme.bodySmall,
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        review.comment,
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.bodyMedium,
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        '${review.timestamp}',
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.labelSmall,
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 6),
-                            Text(
-                              review.comment,
-                              style: Theme.of(context).textTheme.bodyMedium,
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              review.date,
-                              style: Theme.of(context).textTheme.labelSmall,
-                            ),
-                          ],
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
+                      )
+                      .toList(growable: false),
+                );
+              },
+            ),
+            const SizedBox(height: 8),
+            Slider(
+              min: 1,
+              max: 5,
+              divisions: 8,
+              label: _pendingRating.toStringAsFixed(1),
+              value: _pendingRating,
+              onChanged: (value) => setState(() => _pendingRating = value),
+            ),
+            TextField(
+              controller: _reviewController,
+              decoration: const InputDecoration(
+                labelText: 'Write a review',
+                border: OutlineInputBorder(),
+              ),
+              minLines: 2,
+              maxLines: 3,
+            ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerRight,
+              child: FilledButton(
+                onPressed: _submitReview,
+                child: const Text('Submit review'),
               ),
             ),
           ],
         ),
       ),
     );
+  }
+
+  SliverToBoxAdapter _buildSupportChatSection(String title) {
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _sectionTitle(title),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 220,
+              child: StreamBuilder<List<ChatMessage>>(
+                stream: _chatService.watchSupportMessages(),
+                builder: (context, snapshot) {
+                  final messages = snapshot.data ?? <ChatMessage>[];
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (snapshot.hasError) {
+                    return const Center(child: Text('Chat unavailable.'));
+                  }
+                  if (messages.isEmpty) {
+                    return const Center(
+                      child: Text('No messages yet. Start a support chat.'),
+                    );
+                  }
+                  return ListView.builder(
+                    reverse: true,
+                    itemCount: messages.length,
+                    itemBuilder: (context, index) {
+                      final msg = messages[index];
+                      return ListTile(
+                        dense: true,
+                        title: Text(msg.senderName),
+                        subtitle: Text(msg.text),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _chatController,
+                    decoration: const InputDecoration(
+                      hintText: 'Message support...',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton.filled(
+                  onPressed: _sendSupportMessage,
+                  icon: const Icon(Icons.send),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _submitReview() async {
+    final appState = AppStateScope.of(context);
+    final reviewText = _reviewController.text.trim();
+    if (reviewText.isEmpty) return;
+    try {
+      await _reviewService.addReview(
+        carId: widget.restaurant.id,
+        userName: appState.user.username.isEmpty
+            ? 'Car Rent User'
+            : appState.user.username,
+        rating: _pendingRating,
+        comment: reviewText,
+      );
+      _reviewController.clear();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.toString())));
+    }
+  }
+
+  Future<void> _sendSupportMessage() async {
+    final appState = AppStateScope.of(context);
+    final text = _chatController.text.trim();
+    if (text.isEmpty) return;
+    try {
+      await _chatService.sendSupportMessage(
+        text: text,
+        senderName: appState.user.username.isEmpty
+            ? 'Car Rent User'
+            : appState.user.username,
+      );
+      _chatController.clear();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.toString())));
+    }
   }
 
   @override
@@ -428,9 +585,9 @@ class _RestaurantPageState extends State<RestaurantPage> {
           ListTile(
             leading: const Icon(Icons.logout),
             title: const Text('Logout'),
-            onTap: () {
+            onTap: () async {
               Navigator.pop(context);
-              AppStateScope.of(context).user.logout();
+              await AppStateScope.of(context).user.logout();
             },
           ),
           SwitchListTile.adaptive(
@@ -462,6 +619,8 @@ class _RestaurantPageState extends State<RestaurantPage> {
   @override
   void dispose() {
     _checkoutBarTimer?.cancel();
+    _reviewController.dispose();
+    _chatController.dispose();
     super.dispose();
   }
 }

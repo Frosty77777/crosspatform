@@ -11,24 +11,45 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
-  final _usernameController = TextEditingController();
+  final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  bool _isSignUp = false;
+  bool _isLoading = false;
 
   @override
   void dispose() {
-    _usernameController.dispose();
+    _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
-  void _login() {
+  Future<void> _submitAuth() async {
     final state = AppStateScope.of(context);
-    state.user.login(
-      username: _usernameController.text,
-      password: _passwordController.text,
-    );
-    if (state.user.isLoggedIn) {
-      context.go('/explore');
+    setState(() => _isLoading = true);
+    try {
+      if (_isSignUp) {
+        await state.user.signUp(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+        );
+      } else {
+        await state.user.signIn(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+        );
+      }
+      if (mounted) {
+        context.go('/explore');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString())),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -53,21 +74,16 @@ class _LoginPageState extends State<LoginPage> {
                   },
                   child: Column(
                     children: [
-                      // TODO: Replace with your actual login header asset path.
                       Image.asset(
-                        'assets/images/login_header_placeholder.png',
+                        'assets/restaurants/blacklogo.webp',
                         height: 110,
-                        errorBuilder: (context, error, stackTrace) => const Icon(
-                          Icons.directions_car_filled_rounded,
-                          size: 72,
-                        ),
                       ),
                       const SizedBox(height: 16),
                     ],
                   ),
                 ),
                 Text(
-                  'Welcome back',
+                  _isSignUp ? 'Create account' : 'Welcome back',
                   style: Theme.of(context)
                       .textTheme
                       .headlineSmall
@@ -75,14 +91,14 @@ class _LoginPageState extends State<LoginPage> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Login to continue',
+                  _isSignUp ? 'Sign up to continue' : 'Login to continue',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
                 const SizedBox(height: 20),
                 TextField(
-                  controller: _usernameController,
+                  controller: _emailController,
                   decoration: const InputDecoration(
-                    labelText: 'Username',
+                    labelText: 'Email',
                     prefixIcon: Icon(Icons.person_outline),
                     border: OutlineInputBorder(),
                   ),
@@ -99,8 +115,18 @@ class _LoginPageState extends State<LoginPage> {
                 ),
                 const SizedBox(height: 16),
                 FilledButton(
-                  onPressed: _login,
-                  child: const Text('Login'),
+                  onPressed: _isLoading ? null : _submitAuth,
+                  child: Text(_isSignUp ? 'Sign Up' : 'Sign In'),
+                ),
+                TextButton(
+                  onPressed: _isLoading
+                      ? null
+                      : () => setState(() => _isSignUp = !_isSignUp),
+                  child: Text(
+                    _isSignUp
+                        ? 'Already have an account? Sign In'
+                        : 'Need an account? Sign Up',
+                  ),
                 ),
               ],
             ),

@@ -1,21 +1,40 @@
 import 'package:flutter/foundation.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+import '../services/auth_service.dart';
 
 class UserManager extends ChangeNotifier {
-  String? _username;
+  final AuthService _authService;
+  User? _firebaseUser;
+  late final Stream<User?> _authStateStream;
 
-  bool get isLoggedIn => _username != null && _username!.isNotEmpty;
-  String get username => _username ?? '';
-
-  void login({required String username, required String password}) {
-    // Demo auth: accept any non-empty credentials.
-    if (username.trim().isEmpty || password.isEmpty) return;
-    _username = username.trim();
-    notifyListeners();
+  UserManager({AuthService? authService})
+    : _authService = authService ?? AuthService() {
+    _authStateStream = _authService.authStateChanges();
+    _authStateStream.listen((user) {
+      _firebaseUser = user;
+      notifyListeners();
+    });
   }
 
-  void logout() {
-    _username = null;
-    notifyListeners();
+  bool get isLoggedIn => _firebaseUser != null;
+  String get username => _firebaseUser?.email ?? '';
+
+  Future<void> signIn({
+    required String email,
+    required String password,
+  }) async {
+    await _authService.signIn(email: email, password: password);
+  }
+
+  Future<void> signUp({
+    required String email,
+    required String password,
+  }) async {
+    await _authService.signUp(email: email, password: password);
+  }
+
+  Future<void> logout() async {
+    await _authService.signOut();
   }
 }
-
