@@ -15,6 +15,8 @@ import 'package:golden_toolkit/golden_toolkit.dart';
 import 'package:untitled2/components/restaurant_item.dart';
 import 'package:untitled2/models/restaurant.dart';
 
+import '../../helpers/fake_network_images.dart';
+
 void main() {
   // Reusable test fixtures (kept const where possible).
   final tesla = Item(
@@ -137,39 +139,54 @@ void main() {
     }
 
     testGoldens('can support light theme', (tester) async {
-      // Arrange
-      final builder = GoldenBuilder.grid(columns: 2, widthToHeightRatio: 1)
-        ..addScenario('Light - Premium', buildItem(tesla))
-        ..addScenario('Light - Compact', buildItem(corolla))
-        ..addScenario('Light - Long description', buildItem(bmwX5))
-        ..addScenario('Light - Budget', buildItem(cheap));
+      // The Flutter test binding returns HTTP 400 for every request by
+      // default, which would make `Image.network` precaching fail. We
+      // install a fake HttpClient that returns a 1×1 transparent PNG
+      // instead, then reset it before the framework's painting-var
+      // invariants are checked.
+      installFakeNetworkImages();
+      try {
+        // Arrange
+        final builder = GoldenBuilder.grid(columns: 2, widthToHeightRatio: 1)
+          ..addScenario('Light - Premium', buildItem(tesla))
+          ..addScenario('Light - Compact', buildItem(corolla))
+          ..addScenario('Light - Long description', buildItem(bmwX5))
+          ..addScenario('Light - Budget', buildItem(cheap));
 
-      // Act
-      await tester.pumpWidgetBuilder(
-        builder.build(),
-        wrapper: materialAppWrapper(theme: ThemeData.light()),
-      );
+        // Act
+        await tester.pumpWidgetBuilder(
+          builder.build(),
+          wrapper: materialAppWrapper(theme: ThemeData.light()),
+        );
 
-      // Assert
-      await screenMatchesGolden(tester, 'light_restaurant_item');
+        // Assert
+        await screenMatchesGolden(tester, 'light_restaurant_item');
+      } finally {
+        uninstallFakeNetworkImages();
+      }
     });
 
     testGoldens('can support dark theme', (tester) async {
-      // Arrange
-      final builder = GoldenBuilder.grid(columns: 2, widthToHeightRatio: 1)
-        ..addScenario('Dark - Premium', buildItem(tesla))
-        ..addScenario('Dark - Compact', buildItem(corolla))
-        ..addScenario('Dark - Long description', buildItem(bmwX5))
-        ..addScenario('Dark - Budget', buildItem(cheap));
+      installFakeNetworkImages();
+      try {
+        // Arrange
+        final builder = GoldenBuilder.grid(columns: 2, widthToHeightRatio: 1)
+          ..addScenario('Dark - Premium', buildItem(tesla))
+          ..addScenario('Dark - Compact', buildItem(corolla))
+          ..addScenario('Dark - Long description', buildItem(bmwX5))
+          ..addScenario('Dark - Budget', buildItem(cheap));
 
-      // Act
-      await tester.pumpWidgetBuilder(
-        builder.build(),
-        wrapper: materialAppWrapper(theme: ThemeData.dark()),
-      );
+        // Act
+        await tester.pumpWidgetBuilder(
+          builder.build(),
+          wrapper: materialAppWrapper(theme: ThemeData.dark()),
+        );
 
-      // Assert
-      await screenMatchesGolden(tester, 'dark_restaurant_item');
+        // Assert
+        await screenMatchesGolden(tester, 'dark_restaurant_item');
+      } finally {
+        uninstallFakeNetworkImages();
+      }
     });
   });
 }

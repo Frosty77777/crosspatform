@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../constants.dart';
 import '../models/car_catalog.dart';
 import '../models/restaurant.dart';
 import '../state/favorites_notifier.dart';
@@ -45,9 +46,16 @@ class RestaurantLandscapeCard extends ConsumerWidget {
                             errorBuilder: (context, error, stackTrace) =>
                                 const Center(child: Icon(Icons.directions_car)),
                           )
-                        : Image.asset(
-                            restaurant.imageUrl,
-                            fit: BoxFit.cover,
+                        : ColoredBox(
+                            color: restaurant.imageUrl == kCashAutoLogoAsset
+                                ? const Color(0xFFD4738A)
+                                : Colors.transparent,
+                            child: Image.asset(
+                              restaurant.imageUrl,
+                              fit: restaurant.imageUrl == kCashAutoLogoAsset
+                                  ? BoxFit.contain
+                                  : BoxFit.cover,
+                            ),
                           ),
                   ),
                   Positioned(

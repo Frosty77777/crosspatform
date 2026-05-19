@@ -4,3 +4,9 @@
 # the flutter_test block so platform-specific tests can opt in.
 flutter_test:
   enable: true
+
+# Declare custom tags used by golden_toolkit's `testGoldens` helper, so
+# the test runner doesn't warn about an unknown tag.
+tags:
+  golden:
+    description: "Visual regression / golden snapshot tests."

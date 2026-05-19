@@ -1,10 +1,11 @@
 // flutter_test_config.dart
 //
-// Auto-discovered by `flutter test`. It runs ONCE before any test in the
-// `test/` directory.  Here we use it to:
+// Auto-discovered by `flutter test`. Runs ONCE before any test in the
+// `test/` directory.  Here we:
 //   • load real Material/icon fonts (required so golden snapshots render
 //     glyphs instead of empty boxes), and
-//   • route every test through golden_toolkit's configured zone.
+//   • route every test through golden_toolkit's configured zone so
+//     baseline PNGs land under a `goldens/` subdirectory.
 
 import 'dart:async';
 
@@ -18,8 +19,6 @@ Future<void> testExecutable(FutureOr<void> Function() testMain) async {
       await testMain();
     },
     config: GoldenToolkitConfiguration(
-      // Use the default file-name builder so goldens land next to the
-      // test file under a `goldens/` subdirectory.
       fileNameFactory: (name) => 'goldens/$name.png',
     ),
   );

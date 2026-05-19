@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'components/checkout_sheet.dart';
+import 'constants.dart';
 import 'screens/explore_page.dart';
 import 'screens/account_page.dart';
 import 'screens/login_page.dart';
@@ -123,10 +124,6 @@ class AppShell extends StatelessWidget {
     return Scaffold(
       // ── AppBar ──────────────────────────────────────────────────────────
       appBar: AppBar(
-        title: const Text(
-          'Car Rent',
-          style: TextStyle(fontWeight: FontWeight.w700),
-        ),
         backgroundColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
         // Hamburger opens the drawer
@@ -153,19 +150,13 @@ class AppShell extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                CircleAvatar(
+                const CircleAvatar(
                   radius: 28,
-                  backgroundColor: Theme.of(
-                    context,
-                  ).colorScheme.primaryContainer,
-                  child: Icon(
-                    Icons.directions_car,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
+                  backgroundImage: AssetImage(kAppLogoAsset),
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'Car Rent',
+                  'Carrent',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w700,
                   ),

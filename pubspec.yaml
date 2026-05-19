@@ -70,6 +70,14 @@ dev_dependencies:
   # Chapter 18 — testing add-ons.
   mocktail: ^1.0.4          # null-safe mocks, no codegen required
   golden_toolkit: ^0.15.0   # visual regression / golden tests
+  flutter_launcher_icons: ^0.14.4
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: assets/brand/car_rent_logo.png
+  adaptive_icon_background: "#C73866"
+  adaptive_icon_foreground: assets/brand/car_rent_logo.png
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -87,6 +95,7 @@ flutter:
     - assets/profile_pics/
     - assets/restaurants/
     - assets/restaurants/blacklogo.webp
+    - assets/brand/car_rent_logo.png
     - assets/animations/empty_cart.json
     - assets/data/car_catalog.json
 

@@ -1,5 +1,11 @@
 import 'package:flutter/material.dart';
 
+/// App-wide Carrent logo (login, drawer, launcher).
+const kAppLogoAsset = 'assets/brand/car_rent_logo.png';
+
+/// CashAuto Rent provider logo on explore carousel cards.
+const kCashAutoLogoAsset = 'assets/restaurants/blacklogo.webp';
+
 enum ColorSelection {
   deepPurple('Deep Purple', Colors.deepPurple),
   purple('Purple', Colors.purple),

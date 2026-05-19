@@ -5,6 +5,7 @@
 
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:untitled2/constants.dart';
 import 'package:untitled2/models/restaurant.dart';
 
 void main() {
@@ -19,7 +20,7 @@ void main() {
         'Test Rental',
         'Some Street 1',
         'Premium sedans',
-        'assets/restaurants/blacklogo.webp',
+        kAppLogoAsset,
         distance,
         rating,
         items,

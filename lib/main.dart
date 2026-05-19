@@ -55,7 +55,7 @@ class _CarRentState extends State<CarRent> {
         builder: (context, _) => MaterialApp.router(
           // ── Chapter 8: swap MaterialApp for MaterialApp.router ──────────────
           routerConfig: appRouter,
-          title: 'Car Rent',
+          title: 'Carrent',
           debugShowCheckedModeBanner: false,
           themeMode: _themeManager.themeMode,
           theme: ThemeData(

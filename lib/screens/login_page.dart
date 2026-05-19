@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../components/app_logo.dart';
 import '../state/app_state_scope.dart';
 
 class LoginPage extends StatefulWidget {
@@ -74,10 +75,7 @@ class _LoginPageState extends State<LoginPage> {
                   },
                   child: Column(
                     children: [
-                      Image.asset(
-                        'assets/restaurants/blacklogo.webp',
-                        height: 110,
-                      ),
+                      const AppLogo(size: 110, circular: true),
                       const SizedBox(height: 16),
                     ],
                   ),

@@ -1,3 +1,7 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+import '../constants.dart';
+
 class Item {
   // Represents a rentable car option shown inside a provider page.
   final String name;
@@ -28,6 +32,25 @@ class Review {
     required this.date,
     this.imageUrl = '',
   });
+
+  factory Review.fromFirestore(DocumentSnapshot<Map<String, dynamic>> doc) {
+    final data = doc.data() ?? {};
+    return Review(
+      reviewerName: data['reviewerName'] as String? ?? '',
+      rating: (data['rating'] as num?)?.toDouble() ?? 0,
+      comment: data['comment'] as String? ?? '',
+      date: data['date'] as String? ?? '',
+      imageUrl: data['imageUrl'] as String? ?? '',
+    );
+  }
+
+  Map<String, dynamic> toMap() => {
+    'reviewerName': reviewerName,
+    'rating': rating,
+    'comment': comment,
+    'date': date,
+    'imageUrl': imageUrl,
+  };
 }
 
 class Restaurant {
@@ -65,7 +88,7 @@ List<Restaurant> restaurants = [
     'CashAuto Rent',
     'Zhaidarman2/1',
     'Premium sedans, luxury SUVs, executive pickup',
-    'assets/restaurants/blacklogo.webp',
+    kCashAutoLogoAsset,
     1.2,
     4.8,
     [

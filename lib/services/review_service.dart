@@ -1,46 +1,31 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 
-import '../models/car_review.dart';
+import '../models/restaurant.dart';
 
 class ReviewService {
   final FirebaseFirestore _firestore;
-  final FirebaseAuth _auth;
 
-  ReviewService({
-    FirebaseFirestore? firestore,
-    FirebaseAuth? auth,
-  }) : _firestore = firestore ?? FirebaseFirestore.instance,
-       _auth = auth ?? FirebaseAuth.instance;
+  ReviewService({FirebaseFirestore? firestore})
+    : _firestore = firestore ?? FirebaseFirestore.instance;
 
-  Stream<List<CarReview>> watchReviewsForCar(String carId) {
+  Stream<List<Review>> getReviews(String restaurantId) {
     return _firestore
-        .collection('car_reviews')
-        .where('carId', isEqualTo: carId)
-        .orderBy('timestamp', descending: true)
-        .limit(50)
+        .collection('reviews')
+        .doc(restaurantId)
+        .collection('entries')
+        .orderBy('date', descending: true)
         .snapshots()
-        .map((snapshot) => snapshot.docs.map(CarReview.fromDoc).toList());
+        .map(
+          (snapshot) =>
+              snapshot.docs.map(Review.fromFirestore).toList(growable: false),
+        );
   }
 
-  Future<void> addReview({
-    required String carId,
-    required String userName,
-    required double rating,
-    required String comment,
-  }) async {
-    final user = _auth.currentUser;
-    if (user == null) {
-      throw Exception('Please sign in to add a review.');
-    }
-
-    await _firestore.collection('car_reviews').add({
-      'carId': carId,
-      'userId': user.uid,
-      'userName': userName,
-      'rating': rating,
-      'comment': comment,
-      'timestamp': FieldValue.serverTimestamp(),
-    });
+  Future<void> addReview(String restaurantId, Review review) async {
+    await _firestore
+        .collection('reviews')
+        .doc(restaurantId)
+        .collection('entries')
+        .add(review.toMap());
   }
 }

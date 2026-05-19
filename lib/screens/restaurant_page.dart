@@ -5,8 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../components/checkout_sheet.dart';
+import '../constants.dart';
 import '../components/restaurant_item.dart';
-import '../models/car_review.dart';
 import '../models/chat_message.dart';
 import '../models/restaurant.dart';
 import '../services/chat_service.dart';
@@ -32,9 +32,7 @@ class _RestaurantPageState extends State<RestaurantPage> {
   bool _showCheckoutBar = false;
   final ReviewService _reviewService = ReviewService();
   final ChatService _chatService = ChatService();
-  final TextEditingController _reviewController = TextEditingController();
   final TextEditingController _chatController = TextEditingController();
-  double _pendingRating = 5;
 
   double _calculateConstrainedWidth(double screenWidth) {
     return (screenWidth > desktopThreshold
@@ -92,11 +90,22 @@ class _RestaurantPageState extends State<RestaurantPage> {
                     tag: 'car_image_${widget.restaurant.id}',
                     child: Container(
                       decoration: BoxDecoration(
-                        color: Colors.grey,
                         borderRadius: BorderRadius.circular(24.0),
+                        gradient: widget.restaurant.imageUrl == kCashAutoLogoAsset
+                            ? const LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [Color(0xFFE8919A), Color(0xFFC73866)],
+                              )
+                            : null,
+                        color: widget.restaurant.imageUrl == kCashAutoLogoAsset
+                            ? null
+                            : Colors.grey,
                         image: DecorationImage(
                           image: AssetImage(widget.restaurant.imageUrl),
-                          fit: BoxFit.cover,
+                          fit: widget.restaurant.imageUrl == kCashAutoLogoAsset
+                              ? BoxFit.contain
+                              : BoxFit.cover,
                         ),
                       ),
                     ),
@@ -107,7 +116,7 @@ class _RestaurantPageState extends State<RestaurantPage> {
                   left: 16.0,
                   child: CircleAvatar(
                     radius: 30,
-                    child: Icon(Icons.directions_car, color: Colors.white),
+                    backgroundImage: AssetImage(kAppLogoAsset),
                   ),
                 ),
               ],
@@ -318,10 +327,10 @@ class _RestaurantPageState extends State<RestaurantPage> {
           children: [
             _sectionTitle(title),
             const SizedBox(height: 8),
-            StreamBuilder<List<CarReview>>(
-              stream: _reviewService.watchReviewsForCar(widget.restaurant.id),
+            StreamBuilder<List<Review>>(
+              stream: _reviewService.getReviews(widget.restaurant.id),
               builder: (context, snapshot) {
-                final reviews = snapshot.data ?? <CarReview>[];
+                final reviews = snapshot.data ?? <Review>[];
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Padding(
                     padding: EdgeInsets.symmetric(vertical: 12),
@@ -352,11 +361,19 @@ class _RestaurantPageState extends State<RestaurantPage> {
                               children: [
                                 CircleAvatar(
                                   radius: 22,
-                                  child: Text(
-                                    review.userName.isNotEmpty
-                                        ? review.userName[0].toUpperCase()
-                                        : 'U',
-                                  ),
+                                  backgroundImage: review.imageUrl.isNotEmpty
+                                      ? (review.imageUrl.startsWith('http')
+                                            ? NetworkImage(review.imageUrl)
+                                            : AssetImage(review.imageUrl))
+                                      : null,
+                                  child: review.imageUrl.isEmpty
+                                      ? Text(
+                                          review.reviewerName.isNotEmpty
+                                              ? review.reviewerName[0]
+                                                    .toUpperCase()
+                                              : 'U',
+                                        )
+                                      : null,
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(
@@ -367,7 +384,7 @@ class _RestaurantPageState extends State<RestaurantPage> {
                                         children: [
                                           Expanded(
                                             child: Text(
-                                              review.userName,
+                                              review.reviewerName,
                                               style: Theme.of(context)
                                                   .textTheme
                                                   .titleSmall
@@ -393,7 +410,7 @@ class _RestaurantPageState extends State<RestaurantPage> {
                                       ),
                                       const SizedBox(height: 6),
                                       Text(
-                                        '${review.timestamp}',
+                                        review.date,
                                         style: Theme.of(
                                           context,
                                         ).textTheme.labelSmall,
@@ -409,32 +426,6 @@ class _RestaurantPageState extends State<RestaurantPage> {
                       .toList(growable: false),
                 );
               },
-            ),
-            const SizedBox(height: 8),
-            Slider(
-              min: 1,
-              max: 5,
-              divisions: 8,
-              label: _pendingRating.toStringAsFixed(1),
-              value: _pendingRating,
-              onChanged: (value) => setState(() => _pendingRating = value),
-            ),
-            TextField(
-              controller: _reviewController,
-              decoration: const InputDecoration(
-                labelText: 'Write a review',
-                border: OutlineInputBorder(),
-              ),
-              minLines: 2,
-              maxLines: 3,
-            ),
-            const SizedBox(height: 8),
-            Align(
-              alignment: Alignment.centerRight,
-              child: FilledButton(
-                onPressed: _submitReview,
-                child: const Text('Submit review'),
-              ),
             ),
           ],
         ),
@@ -508,26 +499,107 @@ class _RestaurantPageState extends State<RestaurantPage> {
     );
   }
 
-  Future<void> _submitReview() async {
-    final appState = AppStateScope.of(context);
-    final reviewText = _reviewController.text.trim();
-    if (reviewText.isEmpty) return;
-    try {
-      await _reviewService.addReview(
-        carId: widget.restaurant.id,
-        userName: appState.user.username.isEmpty
-            ? 'Car Rent User'
-            : appState.user.username,
-        rating: _pendingRating,
-        comment: reviewText,
-      );
-      _reviewController.clear();
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(e.toString())));
-    }
+  void _showWriteReviewSheet() {
+    var rating = 5;
+    final commentController = TextEditingController();
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (sheetContext, setSheetState) {
+            return Padding(
+              padding: EdgeInsets.fromLTRB(
+                24,
+                24,
+                24,
+                MediaQuery.viewInsetsOf(sheetContext).bottom + 24,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'Write a Review',
+                    style: Theme.of(sheetContext).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(5, (index) {
+                      final starValue = index + 1;
+                      return IconButton(
+                        onPressed: () =>
+                            setSheetState(() => rating = starValue),
+                        icon: Icon(
+                          starValue <= rating ? Icons.star : Icons.star_border,
+                          color: Colors.amber,
+                          size: 36,
+                        ),
+                      );
+                    }),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: commentController,
+                    decoration: const InputDecoration(
+                      labelText: 'Your comment',
+                      border: OutlineInputBorder(),
+                    ),
+                    minLines: 3,
+                    maxLines: 5,
+                  ),
+                  const SizedBox(height: 16),
+                  FilledButton(
+                    onPressed: () async {
+                      final comment = commentController.text.trim();
+                      if (comment.isEmpty) return;
+
+                      final username = AppStateScope.of(context).user.username;
+                      final reviewerName = username.isEmpty
+                          ? 'Carrent User'
+                          : username;
+
+                      try {
+                        await _reviewService.addReview(
+                          widget.restaurant.id,
+                          Review(
+                            reviewerName: reviewerName,
+                            rating: rating.toDouble(),
+                            comment: comment,
+                            date: DateTime.now().toIso8601String(),
+                          ),
+                        );
+                        if (sheetContext.mounted) {
+                          Navigator.pop(sheetContext);
+                        }
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Review submitted'),
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        if (sheetContext.mounted) {
+                          ScaffoldMessenger.of(sheetContext).showSnackBar(
+                            SnackBar(content: Text(e.toString())),
+                          );
+                        }
+                      }
+                    },
+                    child: const Text('Submit'),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    ).whenComplete(commentController.dispose);
   }
 
   Future<void> _sendSupportMessage() async {
@@ -538,7 +610,7 @@ class _RestaurantPageState extends State<RestaurantPage> {
       await _chatService.sendSupportMessage(
         text: text,
         senderName: appState.user.username.isEmpty
-            ? 'Car Rent User'
+            ? 'Carrent User'
             : appState.user.username,
       );
       _chatController.clear();
@@ -557,6 +629,11 @@ class _RestaurantPageState extends State<RestaurantPage> {
     final themeManager = ThemeManagerScope.of(context);
 
     return Scaffold(
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _showWriteReviewSheet,
+        icon: const Icon(Icons.rate_review_outlined),
+        label: const Text('Write a Review'),
+      ),
       drawer: NavigationDrawer(
         onDestinationSelected: (index) {
           Navigator.pop(context);
@@ -619,7 +696,6 @@ class _RestaurantPageState extends State<RestaurantPage> {
   @override
   void dispose() {
     _checkoutBarTimer?.cancel();
-    _reviewController.dispose();
     _chatController.dispose();
     super.dispose();
   }
